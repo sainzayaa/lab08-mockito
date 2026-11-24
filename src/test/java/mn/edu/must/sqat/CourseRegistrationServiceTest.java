@@ -104,8 +104,9 @@ class CourseRegistrationServiceTest {
 
     // A6
     @Test
-    void register_nullStudentId_throwsIllegalArgumentAndTouchesNothing() {
+    void register_nullArgument_throwsIllegalArgumentAndTouchesNothing() {
         assertThrows(IllegalArgumentException.class, () -> service.register(null, "CS101"));
+        assertThrows(IllegalArgumentException.class, () -> service.register("S1", null));
 
         verifyNoInteractions(repository, emailSender);
     }
