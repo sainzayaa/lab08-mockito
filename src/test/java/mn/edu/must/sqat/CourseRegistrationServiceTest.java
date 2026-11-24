@@ -87,4 +87,60 @@ class CourseRegistrationServiceTest {
         assertEquals("ERROR_PREREQUISITES", result);
         verify(repository, never()).saveRegistration(anyString(), anyString());
     }
+
+    // A5
+    @Test
+    void register_emailSenderThrows_stillReturnsOkAndSaves() {
+        when(repository.findStudent("S1")).thenReturn(student(true, List.of()));
+        when(repository.courseExists("CS101")).thenReturn(true);
+        doThrow(new RuntimeException("SMTP down"))
+                .when(emailSender).send(anyString(), anyString(), anyString());
+
+        String result = service.register("S1", "CS101");
+
+        assertEquals("OK", result);
+        verify(repository).saveRegistration("S1", "CS101");
+    }
+
+    // A6
+    @Test
+    void register_nullStudentId_throwsIllegalArgumentAndTouchesNothing() {
+        assertThrows(IllegalArgumentException.class, () -> service.register(null, "CS101"));
+
+        verifyNoInteractions(repository, emailSender);
+    }
+
+    // A7
+    @Test
+    void register_success_emailBodyContainsCourseCode() {
+        when(repository.findStudent("S1")).thenReturn(student(true, List.of()));
+        when(repository.courseExists("CS101")).thenReturn(true);
+        ArgumentCaptor<String> body = ArgumentCaptor.forClass(String.class);
+
+        service.register("S1", "CS101");
+
+        verify(emailSender).send(eq("s1@must.edu.mn"), anyString(), body.capture());
+        assertTrue(body.getValue().contains("CS101"));
+    }
+
+    // A8
+    @ParameterizedTest(name = "{0} -> {4}")
+    @CsvSource({
+            "noStudent,false,true,false,ERROR_NO_STUDENT",
+            "inactiveStudent,true,false,false,ERROR_INACTIVE_STUDENT",
+            "missingPrerequisite,true,true,true,ERROR_PREREQUISITES"
+    })
+    void register_errorCases_returnExpectedCodeAndDoNotSave(
+            String scenario, boolean exists, boolean active, boolean prereqMissing, String expected) {
+        lenient().when(repository.findStudent("S1"))
+                .thenReturn(exists ? student(active, List.of()) : null);
+        lenient().when(repository.courseExists("CS201")).thenReturn(true);
+        lenient().when(repository.prerequisites("CS201"))
+                .thenReturn(prereqMissing ? List.of("CS101") : List.of());
+
+        String result = service.register("S1", "CS201");
+
+        assertEquals(expected, result);
+        verify(repository, never()).saveRegistration(anyString(), anyString());
+    }
 }
